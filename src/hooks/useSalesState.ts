@@ -103,6 +103,27 @@ export const useSalesState = () => {
     existingSales.push(saleWithMeta);
     localStorage.setItem('sales', JSON.stringify(existingSales));
     
+    // If it's a credit sale, also save the credit transaction locally
+    if (paymentType === 'credit' && selectedCustomer) {
+      console.log('Saving credit transaction locally for customer:', selectedCustomer.id);
+      
+      const creditTransaction = {
+        id: `credit_${Date.now()}`, // Unique local ID
+        customerId: selectedCustomer.id,
+        type: 'sale' as const,
+        amount: getTotalAmount(),
+        notes: `Credit sale - ${cart.length} items`,
+        date: new Date(),
+        synced: false // Mark as unsynced initially
+      };
+      
+      const existingCreditTransactions = JSON.parse(localStorage.getItem('creditTransactions') || '[]');
+      existingCreditTransactions.push(creditTransaction);
+      localStorage.setItem('creditTransactions', JSON.stringify(existingCreditTransactions));
+      
+      console.log('Credit transaction saved locally:', creditTransaction);
+    }
+    
     // Try to save to Supabase in background
     console.log('Attempting to save sale to database...');
     const saveResult = await salesService.saveSale(sale);
@@ -113,6 +134,18 @@ export const useSalesState = () => {
         s.id === saleWithMeta.id ? { ...s, synced: true } : s
       );
       localStorage.setItem('sales', JSON.stringify(updatedSales));
+      
+      // If it was a credit sale, mark the credit transaction as synced too
+      if (paymentType === 'credit' && selectedCustomer) {
+        const existingCreditTransactions = JSON.parse(localStorage.getItem('creditTransactions') || '[]');
+        const updatedCreditTransactions = existingCreditTransactions.map((t: any) => 
+          t.customerId === selectedCustomer.id && t.amount === getTotalAmount() && !t.synced
+            ? { ...t, synced: true } 
+            : t
+        );
+        localStorage.setItem('creditTransactions', JSON.stringify(updatedCreditTransactions));
+      }
+      
       console.log('Sale saved to database and marked as synced');
     } else {
       console.log('Sale saved locally but failed to sync to database:', saveResult.error);
