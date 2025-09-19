@@ -19,9 +19,9 @@ export const useCustomerOperations = () => {
     enabled: !!user?.id
   });
 
-  // Get all credit transactions for the current user
+  // Get all credit transactions for the current user (from Supabase + local storage)
   const {
-    data: creditTransactions = [],
+    data: supabaseCreditTransactions = [],
     isLoading: creditTransactionsLoading,
     error: creditTransactionsError,
     refetch: refetchCreditTransactions
@@ -30,6 +30,35 @@ export const useCustomerOperations = () => {
     queryFn: () => customerService.getCreditTransactions(user!.id),
     enabled: !!user?.id
   });
+
+  // Merge Supabase credit transactions with local ones
+  const creditTransactions = [...supabaseCreditTransactions];
+  
+  // Add local credit transactions that haven't been synced yet
+  if (typeof window !== 'undefined') {
+    const localCreditTransactions = JSON.parse(localStorage.getItem('creditTransactions') || '[]');
+    localCreditTransactions.forEach((localTransaction: any) => {
+      // Only add if it's not already in the Supabase data
+      const existsInSupabase = supabaseCreditTransactions.some(
+        supabaseTransaction => 
+          supabaseTransaction.customerId === localTransaction.customerId &&
+          supabaseTransaction.amount === localTransaction.amount &&
+          Math.abs(new Date(supabaseTransaction.date).getTime() - new Date(localTransaction.date).getTime()) < 5000
+      );
+      
+      if (!existsInSupabase) {
+        creditTransactions.push({
+          id: localTransaction.id,
+          customerId: localTransaction.customerId,
+          type: localTransaction.type,
+          amount: localTransaction.amount,
+          notes: localTransaction.notes,
+          date: new Date(localTransaction.date),
+          synced: localTransaction.synced || false
+        });
+      }
+    });
+  }
 
   // Add customer mutation
   const addCustomerMutation = useMutation({
