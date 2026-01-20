@@ -17,6 +17,12 @@ export const productSync = {
       return { success: true, errors: [], synced: 0 };
     }
 
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, errors: ['User not authenticated'], synced: 0 };
+    }
+
     const errors: string[] = [];
     let synced = 0;
 
@@ -30,7 +36,7 @@ export const productSync = {
           .maybeSingle();
 
         if (!existingProduct) {
-          // Create new product
+          // Create new product with user_id
           const { error } = await supabase
             .from('products')
             .insert({
@@ -42,7 +48,8 @@ export const productSync = {
               category: product.category || null,
               sku: product.sku || null,
               expiry_date: product.expiryDate || null,
-              sync_status: 'synced'
+              sync_status: 'synced',
+              user_id: user.id
             });
 
           if (error) {
