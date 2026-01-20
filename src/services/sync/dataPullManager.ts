@@ -51,8 +51,18 @@ export class DataPullManager {
         errors.push(...productsResult.errors);
         return 0;
       } else {
-        localStorage.setItem('products', JSON.stringify(productsResult.products));
-        return productsResult.products.length;
+        // Get existing local products for merge safety
+        const existingProducts = JSON.parse(localStorage.getItem('products') || '[]');
+        
+        // Only replace if server has data OR local is empty
+        // This prevents accidental data loss when RLS returns empty results
+        if (productsResult.products.length > 0 || existingProducts.length === 0) {
+          localStorage.setItem('products', JSON.stringify(productsResult.products));
+          return productsResult.products.length;
+        } else {
+          console.warn('DataPullManager: Server returned empty products but local has data - keeping local data');
+          return 0;
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
