@@ -69,7 +69,7 @@ export const InventorySnapshot = () => {
 
   // Calculate metrics
   const totalProducts = products.length;
-  const lowStockItems = products.filter(product => product.quantity < 5);
+  const lowStockItems = products.filter(product => product.quantity <= 10);
   const lowStockCount = lowStockItems.length;
 
   if (loading) {
