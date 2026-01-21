@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Sale } from "@/types/sales";
 import { SyncResult } from "./types";
 import { productEnsureSync } from "./productEnsureSync";
+import { getUserStorageKey } from "@/hooks/useUserStorage";
 
 // Helper function to check if a string is a valid UUID
 const isValidUUID = (str: string): boolean => {
@@ -13,7 +14,17 @@ const isValidUUID = (str: string): boolean => {
 export const salesSync = {
   async syncSales(): Promise<SyncResult> {
     console.log('SalesSync: Starting enhanced sales sync...');
-    const sales: (Sale & { id: number; synced: boolean })[] = JSON.parse(localStorage.getItem('sales') || '[]').map((s: any) => ({
+    
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, errors: ['User not authenticated'], synced: 0 };
+    }
+
+    const salesStorageKey = getUserStorageKey('sales', user.id);
+    const productsStorageKey = getUserStorageKey('products', user.id);
+    
+    const sales: (Sale & { id: number; synced: boolean })[] = JSON.parse(localStorage.getItem(salesStorageKey) || '[]').map((s: any) => ({
       ...s,
       timestamp: new Date(s.timestamp)
     }));
@@ -24,7 +35,7 @@ export const salesSync = {
     }
 
     // Get all products from localStorage to ensure they exist
-    const storedProducts = localStorage.getItem('products');
+    const storedProducts = localStorage.getItem(productsStorageKey);
     const localProducts = storedProducts ? JSON.parse(storedProducts).map((p: any) => ({
       ...p,
       createdAt: new Date(p.createdAt),
@@ -168,7 +179,7 @@ export const salesSync = {
         const updatedSales = sales.map(s => 
           s.id === sale.id ? { ...s, synced: true } : s
         );
-        localStorage.setItem('sales', JSON.stringify(updatedSales));
+        localStorage.setItem(salesStorageKey, JSON.stringify(updatedSales));
         synced++;
 
         console.log(`SalesSync: Successfully synced sale ${sale.id}`);

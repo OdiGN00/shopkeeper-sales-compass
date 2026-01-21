@@ -7,6 +7,7 @@ import { SalesHistoryHeader } from "./sales-history/SalesHistoryHeader";
 import { SalesHistoryFilters } from "./sales-history/SalesHistoryFilters";
 import { SalesHistorySummaryCards } from "./sales-history/SalesHistorySummaryCards";
 import { SalesListWithPagination } from "./sales-history/SalesListWithPagination";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 interface SalesHistoryProps {
   onBack?: () => void;
@@ -20,11 +21,14 @@ export const SalesHistory = ({ onBack }: SalesHistoryProps) => {
   const [filterType, setFilterType] = useState<FilterType>("week");
   const [customRange, setCustomRange] = useState<{ from?: Date; to?: Date }>({});
   const [currentPage, setCurrentPage] = useState(1);
+  const { getItem, userId } = useUserStorage();
 
   useEffect(() => {
     const loadSales = () => {
-      const existingSales = JSON.parse(localStorage.getItem('sales') || '[]');
-      setSales(existingSales.reverse());
+      if (userId) {
+        const existingSales = getItem<(Sale & { id: number; synced: boolean })[]>('sales', []);
+        setSales([...existingSales].reverse());
+      }
     };
 
     loadSales();
@@ -35,7 +39,7 @@ export const SalesHistory = ({ onBack }: SalesHistoryProps) => {
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  }, [userId, getItem]);
 
   // --- Filtering ---
   let dateRange: { from: Date; to: Date } = (() => {
@@ -63,25 +67,10 @@ export const SalesHistory = ({ onBack }: SalesHistoryProps) => {
     }
   })();
 
-  // Debug logging for custom filter
-  console.log('Filter type:', filterType);
-  console.log('Custom range:', customRange);
-  console.log('Date range:', dateRange);
-  console.log('Total sales before filtering:', sales.length);
-
   const filteredSales = sales.filter((sale) => {
     const saleDate = new Date(sale.timestamp);
-    const isInRange = isWithinInterval(saleDate, { start: dateRange.from, end: dateRange.to });
-    
-    // Debug each sale filtering
-    if (filterType === "custom") {
-      console.log('Sale date:', saleDate, 'In range:', isInRange);
-    }
-    
-    return isInRange;
+    return isWithinInterval(saleDate, { start: dateRange.from, end: dateRange.to });
   });
-
-  console.log('Filtered sales count:', filteredSales.length);
 
   const totalPages = Math.ceil(filteredSales.length / SALES_PER_PAGE);
   const paginatedSales = filteredSales.slice((currentPage - 1) * SALES_PER_PAGE, currentPage * SALES_PER_PAGE);

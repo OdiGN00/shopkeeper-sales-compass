@@ -1,16 +1,11 @@
 import { useState, useEffect } from "react";
-import { Plus, Package, Search } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { AddProductForm } from "./products/AddProductForm";
-import { BatchProductEntry } from "./products/BatchProductEntry";
+import { Package } from "lucide-react";
 import { ProductList } from "./products/ProductList";
 import { useToast } from "@/hooks/use-toast";
 import { ProductsManagerHeader } from "./products/ProductsManagerHeader";
 import { ProductsSearchBar } from "./products/ProductsSearchBar";
 import { ProductStatsCards } from "./products/ProductStatsCards";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 export interface Product {
   id: string;
@@ -33,23 +28,23 @@ export const ProductsManager = () => {
   const [isBatchFormOpen, setIsBatchFormOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { getItem, setItem, userId } = useUserStorage();
 
-  // Load products from localStorage on component mount
+  // Load products from localStorage on component mount or when user changes
   useEffect(() => {
-    loadProducts();
-  }, []);
+    if (userId) {
+      loadProducts();
+    }
+  }, [userId]);
 
   const loadProducts = () => {
     try {
-      const storedProducts = localStorage.getItem('products');
-      if (storedProducts) {
-        const parsedProducts = JSON.parse(storedProducts).map((product: any) => ({
-          ...product,
-          createdAt: new Date(product.createdAt),
-          updatedAt: new Date(product.updatedAt)
-        }));
-        setProducts(parsedProducts);
-      }
+      const parsedProducts = getItem<any[]>('products', []).map((product: any) => ({
+        ...product,
+        createdAt: new Date(product.createdAt),
+        updatedAt: new Date(product.updatedAt)
+      }));
+      setProducts(parsedProducts);
     } catch (error) {
       console.error('Error loading products:', error);
       toast({
@@ -62,13 +57,22 @@ export const ProductsManager = () => {
     }
   };
 
+  // Listen for storage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      if (userId) {
+        loadProducts();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [userId]);
+
   const saveProducts = (updatedProducts: Product[]) => {
     try {
-      localStorage.setItem('products', JSON.stringify(updatedProducts));
+      setItem('products', updatedProducts);
       setProducts(updatedProducts);
-      
-      // Dispatch event to notify other components
-      window.dispatchEvent(new Event('storage'));
     } catch (error) {
       console.error('Error saving products:', error);
       toast({
@@ -147,7 +151,7 @@ export const ProductsManager = () => {
     product.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (loading) {
+  if (loading || !userId) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

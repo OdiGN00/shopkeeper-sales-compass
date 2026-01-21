@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { SalesEntry } from "./SalesEntry";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatCurrency } from "@/lib/utils";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 interface Product {
   id: string;
@@ -18,12 +19,12 @@ export const QuickSalesEntry = () => {
   const { currency } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const { getItem, userId } = useUserStorage();
 
   useEffect(() => {
     const loadProducts = () => {
-      const stored = localStorage.getItem('products');
-      if (stored) {
-        const parsed = JSON.parse(stored);
+      if (userId) {
+        const parsed = getItem<Product[]>('products', []);
         // Take first 5 products for quick add
         setProducts(parsed.slice(0, 5));
       }
@@ -32,7 +33,7 @@ export const QuickSalesEntry = () => {
     loadProducts();
     window.addEventListener('storage', loadProducts);
     return () => window.removeEventListener('storage', loadProducts);
-  }, []);
+  }, [userId, getItem]);
 
   return (
     <>
