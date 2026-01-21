@@ -8,6 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { CartItem } from "@/types/sales";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatCurrency } from "@/lib/utils";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 interface Product {
   id: string;
@@ -38,14 +39,14 @@ export const ProductSelection = ({
   const { currency } = useSettings();
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
+  const { getItem, userId } = useUserStorage();
 
-  // Load products from localStorage on component mount
+  // Load products from user-specific localStorage on component mount
   useEffect(() => {
     const loadProducts = () => {
       try {
-        const storedProducts = localStorage.getItem('products');
-        if (storedProducts) {
-          const parsedProducts = JSON.parse(storedProducts);
+        if (userId) {
+          const parsedProducts = getItem<Product[]>('products', []);
           setProducts(parsedProducts);
         }
       } catch (error) {
@@ -62,7 +63,7 @@ export const ProductSelection = ({
 
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
+  }, [userId, getItem]);
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -76,7 +77,7 @@ export const ProductSelection = ({
 
   const handleAddToCart = (product: Product) => {
     onAddToCart({
-      id: product.id, // Keep as string
+      id: product.id,
       name: product.name,
       price: product.sellingPrice
     });

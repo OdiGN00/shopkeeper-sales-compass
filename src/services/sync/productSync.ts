@@ -2,11 +2,20 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Product } from "@/services/inventoryService";
 import { SyncResult } from "./types";
+import { getUserStorageKey } from "@/hooks/useUserStorage";
 
 export const productSync = {
   async syncProducts(): Promise<SyncResult> {
     console.log('ProductSync: Syncing products...');
-    const products: (Product & { synced?: boolean })[] = JSON.parse(localStorage.getItem('products') || '[]').map((p: any) => ({
+    
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, errors: ['User not authenticated'], synced: 0 };
+    }
+
+    const storageKey = getUserStorageKey('products', user.id);
+    const products: (Product & { synced?: boolean })[] = JSON.parse(localStorage.getItem(storageKey) || '[]').map((p: any) => ({
       ...p,
       createdAt: new Date(p.createdAt),
       updatedAt: new Date(p.updatedAt)
@@ -17,22 +26,17 @@ export const productSync = {
       return { success: true, errors: [], synced: 0 };
     }
 
-    // Get current user ID
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return { success: false, errors: ['User not authenticated'], synced: 0 };
-    }
-
     const errors: string[] = [];
     let synced = 0;
 
     for (const product of unsyncedProducts) {
       try {
-        // Check if product already exists
+        // Check if product already exists for this user
         const { data: existingProduct } = await supabase
           .from('products')
           .select('id')
           .eq('name', product.name)
+          .eq('user_id', user.id)
           .maybeSingle();
 
         if (!existingProduct) {
@@ -62,7 +66,7 @@ export const productSync = {
         const updatedProducts = products.map(p => 
           p.id === product.id ? { ...p, synced: true } : p
         );
-        localStorage.setItem('products', JSON.stringify(updatedProducts));
+        localStorage.setItem(storageKey, JSON.stringify(updatedProducts));
         synced++;
 
       } catch (error) {

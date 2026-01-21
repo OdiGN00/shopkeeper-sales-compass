@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { Sale, CartItem, SalesStep } from "@/types/sales";
 import { Customer } from "@/types/customer";
-import { updateInventoryAfterSale } from "@/services/inventoryService";
 import { salesService } from "@/services/salesService";
 import { useToast } from "@/hooks/use-toast";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 export const useSalesState = () => {
   const [currentStep, setCurrentStep] = useState<SalesStep>('products');
@@ -13,9 +13,9 @@ export const useSalesState = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>();
   const [completedSale, setCompletedSale] = useState<Sale | undefined>();
   const { toast } = useToast();
+  const { getItem, setItem, userId } = useUserStorage();
 
   const addToCart = (product: { id: string; name: string; price: number }) => {
-    console.log('Adding product to cart:', product);
     setCart(prevCart => {
       const existingItem = prevCart.find(item => item.id === product.id);
       if (existingItem) {
@@ -65,25 +65,75 @@ export const useSalesState = () => {
     setCurrentStep('confirm');
   };
 
+  const updateInventoryAfterSale = (cartItems: CartItem[]): { success: boolean; errors: string[] } => {
+    try {
+      if (!userId) {
+        return { success: false, errors: ['User not authenticated'] };
+      }
+
+      const products = getItem<any[]>('products', []);
+      if (products.length === 0) {
+        return { success: false, errors: ['No products found in inventory'] };
+      }
+
+      const errors: string[] = [];
+      const updatedProducts = [...products];
+
+      cartItems.forEach(cartItem => {
+        const productIndex = updatedProducts.findIndex(product => product.id === cartItem.id);
+        
+        if (productIndex === -1) {
+          errors.push(`Product ${cartItem.name} not found in inventory`);
+          return;
+        }
+
+        const product = updatedProducts[productIndex];
+        
+        if (product.quantity < cartItem.quantity) {
+          errors.push(`Insufficient stock for ${cartItem.name}. Available: ${product.quantity}, Required: ${cartItem.quantity}`);
+          return;
+        }
+
+        updatedProducts[productIndex] = {
+          ...product,
+          quantity: product.quantity - cartItem.quantity,
+          updatedAt: new Date()
+        };
+      });
+
+      if (errors.length > 0) {
+        return { success: false, errors };
+      }
+
+      setItem('products', updatedProducts);
+      return { success: true, errors: [] };
+
+    } catch (error) {
+      return { success: false, errors: ['Failed to update inventory: ' + (error as Error).message] };
+    }
+  };
+
   const handleConfirmSale = async () => {
-    console.log('Confirming sale, updating inventory...');
-    console.log('Cart items for inventory update:', cart);
-    
-    // Update inventory before saving the sale
+    if (!userId) {
+      toast({
+        title: "Error",
+        description: "You must be logged in to complete a sale",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const inventoryResult = updateInventoryAfterSale(cart);
     
     if (!inventoryResult.success) {
-      // Show error toast and don't proceed with sale
       toast({
         title: "Inventory Error",
         description: inventoryResult.errors.join(', '),
         variant: "destructive"
       });
-      console.error('Inventory update failed:', inventoryResult.errors);
       return;
     }
 
-    // If inventory update successful, proceed with sale
     const sale: Sale = {
       items: cart,
       total: getTotalAmount(),
@@ -92,75 +142,54 @@ export const useSalesState = () => {
       timestamp: new Date()
     };
     
-    // Save sale to localStorage first with synced: false
     const saleWithMeta = { 
       ...sale, 
       id: Date.now(), 
-      synced: false  // Mark as unsynced initially
+      synced: false
     };
     
-    const existingSales = JSON.parse(localStorage.getItem('sales') || '[]');
+    const existingSales = getItem<any[]>('sales', []);
     existingSales.push(saleWithMeta);
-    localStorage.setItem('sales', JSON.stringify(existingSales));
+    setItem('sales', existingSales);
     
-    // If it's a credit sale, also save the credit transaction locally
     if (paymentType === 'credit' && selectedCustomer) {
-      console.log('Saving credit transaction locally for customer:', selectedCustomer.id);
-      
       const creditTransaction = {
-        id: `credit_${Date.now()}`, // Unique local ID
+        id: `credit_${Date.now()}`,
         customerId: selectedCustomer.id,
         type: 'sale' as const,
         amount: getTotalAmount(),
         notes: `Credit sale - ${cart.length} items`,
         date: new Date(),
-        synced: false // Mark as unsynced initially
+        synced: false
       };
       
-      const existingCreditTransactions = JSON.parse(localStorage.getItem('creditTransactions') || '[]');
+      const existingCreditTransactions = getItem<any[]>('creditTransactions', []);
       existingCreditTransactions.push(creditTransaction);
-      localStorage.setItem('creditTransactions', JSON.stringify(existingCreditTransactions));
-      
-      console.log('Credit transaction saved locally:', creditTransaction);
+      setItem('creditTransactions', existingCreditTransactions);
     }
     
-    // Try to save to Supabase in background
-    console.log('Attempting to save sale to database...');
     const saveResult = await salesService.saveSale(sale);
     
     if (saveResult.success) {
-      // Mark as synced in localStorage
       const updatedSales = existingSales.map((s: any) => 
         s.id === saleWithMeta.id ? { ...s, synced: true } : s
       );
-      localStorage.setItem('sales', JSON.stringify(updatedSales));
+      setItem('sales', updatedSales);
       
-      // If it was a credit sale, mark the credit transaction as synced too
       if (paymentType === 'credit' && selectedCustomer) {
-        const existingCreditTransactions = JSON.parse(localStorage.getItem('creditTransactions') || '[]');
+        const existingCreditTransactions = getItem<any[]>('creditTransactions', []);
         const updatedCreditTransactions = existingCreditTransactions.map((t: any) => 
           t.customerId === selectedCustomer.id && t.amount === getTotalAmount() && !t.synced
             ? { ...t, synced: true } 
             : t
         );
-        localStorage.setItem('creditTransactions', JSON.stringify(updatedCreditTransactions));
+        setItem('creditTransactions', updatedCreditTransactions);
       }
-      
-      console.log('Sale saved to database and marked as synced');
-    } else {
-      console.log('Sale saved locally but failed to sync to database:', saveResult.error);
-      // Sale is already saved locally with synce: false, so it will be retried later
     }
     
-    // Dispatch custom event to notify other components of new sale
-    window.dispatchEvent(new Event('storage'));
-    
-    console.log('Sale completed successfully. Inventory updated and sale saved locally.');
-    
-    // Show success toast
     const successMessage = paymentType === 'credit' 
-      ? `Credit sale of $${getTotalAmount()} completed for ${selectedCustomer?.name}. Customer credit updated.`
-      : `Sale of $${getTotalAmount()} completed successfully. Inventory updated.`;
+      ? `Credit sale of $${getTotalAmount()} completed for ${selectedCustomer?.name}.`
+      : `Sale of $${getTotalAmount()} completed successfully.`;
     
     toast({
       title: "Sale Completed",

@@ -2,11 +2,20 @@
 import { supabase } from "@/integrations/supabase/client";
 import { CreditTransaction } from "@/types/customer";
 import { SyncResult } from "./types";
+import { getUserStorageKey } from "@/hooks/useUserStorage";
 
 export const creditTransactionSync = {
   async syncCreditTransactions(): Promise<SyncResult> {
     console.log('CreditTransactionSync: Syncing credit transactions...');
-    const transactions: (CreditTransaction & { synced: boolean })[] = JSON.parse(localStorage.getItem('creditTransactions') || '[]').map((t: any) => ({
+    
+    // Get current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return { success: false, errors: ['User not authenticated'], synced: 0 };
+    }
+
+    const storageKey = getUserStorageKey('creditTransactions', user.id);
+    const transactions: (CreditTransaction & { synced: boolean })[] = JSON.parse(localStorage.getItem(storageKey) || '[]').map((t: any) => ({
       ...t,
       date: new Date(t.date)
     }));
@@ -29,7 +38,8 @@ export const creditTransactionSync = {
             amount: transaction.amount,
             notes: transaction.notes || null,
             transaction_date: transaction.date.toISOString(),
-            sync_status: 'synced'
+            sync_status: 'synced',
+            user_id: user.id
           });
 
         if (error) {
@@ -41,7 +51,7 @@ export const creditTransactionSync = {
         const updatedTransactions = transactions.map(t => 
           t.id === transaction.id ? { ...t, synced: true } : t
         );
-        localStorage.setItem('creditTransactions', JSON.stringify(updatedTransactions));
+        localStorage.setItem(storageKey, JSON.stringify(updatedTransactions));
         synced++;
 
       } catch (error) {

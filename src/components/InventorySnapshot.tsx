@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Package, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 interface Product {
   id: string;
@@ -21,13 +22,13 @@ interface Product {
 export const InventorySnapshot = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getItem, userId } = useUserStorage();
 
-  // Load products from localStorage
+  // Load products from user-specific localStorage
   const loadProducts = () => {
     try {
-      const storedProducts = localStorage.getItem('products');
-      if (storedProducts) {
-        const parsedProducts = JSON.parse(storedProducts).map((product: any) => ({
+      if (userId) {
+        const parsedProducts = getItem<any[]>('products', []).map((product: any) => ({
           ...product,
           createdAt: new Date(product.createdAt),
           updatedAt: new Date(product.updatedAt)
@@ -65,7 +66,7 @@ export const InventorySnapshot = () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('productsUpdated', handleProductsUpdate);
     };
-  }, []);
+  }, [userId]);
 
   // Calculate metrics
   const totalProducts = products.length;
