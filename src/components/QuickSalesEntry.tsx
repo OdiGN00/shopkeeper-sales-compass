@@ -1,6 +1,5 @@
-
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -8,17 +7,32 @@ import { SalesEntry } from "./SalesEntry";
 import { useSettings } from "@/contexts/SettingsContext";
 import { formatCurrency } from "@/lib/utils";
 
+interface Product {
+  id: string;
+  name: string;
+  sellingPrice: number;
+  quantity: number;
+}
+
 export const QuickSalesEntry = () => {
   const { currency } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
-  
-  const topProducts = [
-    { id: 1, name: "Coca Cola 500ml", price: 25, stock: 48 },
-    { id: 2, name: "Bread", price: 15, stock: 12 },
-    { id: 3, name: "Milk 1L", price: 45, stock: 8 },
-    { id: 4, name: "Rice 1kg", price: 85, stock: 25 },
-    { id: 5, name: "Sugar 1kg", price: 65, stock: 15 }
-  ];
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    const loadProducts = () => {
+      const stored = localStorage.getItem('products');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Take first 5 products for quick add
+        setProducts(parsed.slice(0, 5));
+      }
+    };
+
+    loadProducts();
+    window.addEventListener('storage', loadProducts);
+    return () => window.removeEventListener('storage', loadProducts);
+  }, []);
 
   return (
     <>
@@ -50,7 +64,7 @@ export const QuickSalesEntry = () => {
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-3">Quick Add Products</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {topProducts.map((product) => (
+              {products.map((product) => (
                 <Button
                   key={product.id}
                   variant="outline"
@@ -59,11 +73,16 @@ export const QuickSalesEntry = () => {
                 >
                   <span className="font-medium text-sm">{product.name}</span>
                   <div className="flex justify-between w-full mt-1">
-                    <span className="text-primary font-semibold">{formatCurrency(product.price, currency)}</span>
-                    <span className="text-xs text-muted-foreground">Stock: {product.stock}</span>
+                    <span className="text-primary font-semibold">{formatCurrency(product.sellingPrice, currency)}</span>
+                    <span className="text-xs text-muted-foreground">Stock: {product.quantity}</span>
                   </div>
                 </Button>
               ))}
+              {products.length === 0 && (
+                <p className="text-sm text-muted-foreground col-span-2 text-center py-4">
+                  No products added yet. Add products in the Products tab.
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
