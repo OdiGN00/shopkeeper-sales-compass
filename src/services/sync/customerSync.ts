@@ -8,7 +8,6 @@ export const customerSync = {
   async syncCustomers(): Promise<SyncResult> {
     console.log('CustomerSync: Syncing customers...');
     
-    // Get current user ID
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return { success: false, errors: ['User not authenticated'], synced: 0 };
@@ -31,7 +30,6 @@ export const customerSync = {
 
     for (const customer of unsyncedCustomers) {
       try {
-        // Check if customer already exists for this user
         const { data: existingCustomer } = await supabase
           .from('customers')
           .select('id')
@@ -40,7 +38,6 @@ export const customerSync = {
           .maybeSingle();
 
         if (!existingCustomer) {
-          // Create new customer with user_id
           const { error } = await supabase
             .from('customers')
             .insert({
@@ -58,7 +55,6 @@ export const customerSync = {
           }
         }
 
-        // Mark as synced in localStorage
         const updatedCustomers = customers.map(c => 
           c.id === customer.id ? { ...c, synced: true } : c
         );
@@ -76,9 +72,13 @@ export const customerSync = {
 
   async pullCustomers(): Promise<{ customers: any[], errors: string[] }> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { customers: [], errors: ['Not authenticated'] };
+
       const { data: customersData, error: customersError } = await supabase
         .from('customers')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (customersError) {
         return { customers: [], errors: [`Failed to pull customers: ${customersError.message}`] };

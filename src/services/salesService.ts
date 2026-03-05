@@ -4,6 +4,7 @@ import { Sale, CartItem } from "@/types/sales";
 import { Customer } from "@/types/customer";
 import { Product } from "./inventoryService";
 import { productEnsureSync } from "./sync/productEnsureSync";
+import { getUserStorageKey } from "@/hooks/useUserStorage";
 
 // Helper function to check if a string is a valid UUID
 const isValidUUID = (str: string): boolean => {
@@ -16,15 +17,17 @@ export const salesService = {
     try {
       console.log('SalesService: Saving sale with enhanced validation:', sale);
       
-      // Convert payment type to match database enum
       const paymentTypeMap = {
         'mobile-money': 'mobile_money' as const,
         'cash': 'cash' as const,
         'credit': 'credit' as const
       };
       
-      // Get localStorage products to ensure they exist in Supabase
-      const storedProducts = localStorage.getItem('products');
+      // Get current user for user-specific storage
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const storageKey = getUserStorageKey('products', user?.id);
+      const storedProducts = localStorage.getItem(storageKey);
       if (!storedProducts) {
         return { saleId: '', success: false, error: 'No products found in local inventory' };
       }
@@ -35,7 +38,6 @@ export const salesService = {
         updatedAt: new Date(product.updatedAt)
       }));
 
-      // Find products that are in our sale items
       const saleProductIds = sale.items.map(item => item.id);
       const relevantProducts = localProducts.filter(product => saleProductIds.includes(product.id));
       
@@ -43,22 +45,18 @@ export const salesService = {
         return { saleId: '', success: false, error: 'No matching products found in inventory' };
       }
 
-      // Ensure products exist in Supabase with enhanced validation
       console.log('SalesService: Ensuring products exist with enhanced validation...');
       const productEnsureResult = await productEnsureSync.ensureProductsExist(relevantProducts);
       
       if (!productEnsureResult.success) {
-        console.error('SalesService: Failed to ensure products exist:', productEnsureResult.errors);
         return { saleId: '', success: false, error: `Product sync failed: ${productEnsureResult.errors.join(', ')}` };
       }
 
-      // Map sale items to use Supabase product IDs
       const mappedSaleItems = sale.items.map(item => {
         const supabaseProductId = productEnsureResult.productMap.get(item.id);
         if (!supabaseProductId) {
           throw new Error(`Product mapping not found for item: ${item.name} (${item.id})`);
         }
-        
         return {
           product_id: supabaseProductId,
           quantity: item.quantity,
@@ -67,21 +65,15 @@ export const salesService = {
         };
       });
 
-      // Validate inventory constraints
       const inventoryValidation = await productEnsureSync.validateInventoryConstraints(
         mappedSaleItems, 
         productEnsureResult.productMap
       );
 
       if (!inventoryValidation.valid) {
-        console.error('SalesService: Inventory validation failed:', inventoryValidation.errors);
         return { saleId: '', success: false, error: `Inventory validation failed: ${inventoryValidation.errors.join(', ')}` };
       }
 
-      // Get current user ID for RLS
-      const { data: { user } } = await supabase.auth.getUser();
-
-      // Save the sale
       const { data: saleData, error: saleError } = await supabase
         .from('sales')
         .insert({
@@ -96,13 +88,9 @@ export const salesService = {
         .single();
 
       if (saleError) {
-        console.error('SalesService: Error saving sale:', saleError);
         return { saleId: '', success: false, error: saleError.message };
       }
 
-      console.log('SalesService: Sale saved successfully:', saleData);
-
-      // Save sale items with mapped product IDs
       const saleItemsWithSaleId = mappedSaleItems.map(item => ({
         ...item,
         sale_id: saleData.id,
@@ -114,19 +102,10 @@ export const salesService = {
         .insert(saleItemsWithSaleId);
 
       if (itemsError) {
-        console.error('SalesService: Error saving sale items:', itemsError);
         return { saleId: saleData.id, success: false, error: itemsError.message };
       }
 
-      console.log('SalesService: Sale items saved successfully');
-
-      // If it's a credit sale, create a credit transaction
       if (sale.paymentType === 'credit' && sale.customer) {
-        console.log('SalesService: Creating credit transaction for customer:', sale.customer.id);
-        
-        // Get current user ID for RLS
-        const { data: { user } } = await supabase.auth.getUser();
-        
         const { error: creditError } = await supabase
           .from('credit_transactions')
           .insert({
@@ -141,11 +120,8 @@ export const salesService = {
           });
 
         if (creditError) {
-          console.error('SalesService: Error creating credit transaction:', creditError);
           return { saleId: saleData.id, success: false, error: creditError.message };
         }
-
-        console.log('SalesService: Credit transaction created successfully');
       }
 
       return { saleId: saleData.id, success: true };

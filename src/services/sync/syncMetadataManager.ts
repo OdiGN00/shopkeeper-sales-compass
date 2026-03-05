@@ -1,5 +1,6 @@
 
 import { syncMetricsService } from "./syncMetricsService";
+import { getUserStorageKey } from "@/hooks/useUserStorage";
 
 export class SyncMetadataManager {
   private static instance: SyncMetadataManager;
@@ -11,23 +12,27 @@ export class SyncMetadataManager {
     return SyncMetadataManager.instance;
   }
 
-  updateSyncMetadata(errors: string[], duration: number): void {
-    localStorage.setItem('lastSync', new Date().toISOString());
-    localStorage.setItem('lastSyncDuration', duration.toString());
-    const uniqueErrors = [...new Set(errors)];
-    localStorage.setItem('syncErrors', JSON.stringify(uniqueErrors));
+  updateSyncMetadata(errors: string[], duration: number, userId?: string): void {
+    const lastSyncKey = getUserStorageKey('lastSync', userId);
+    const durationKey = getUserStorageKey('lastSyncDuration', userId);
+    const errorsKey = getUserStorageKey('syncErrors', userId);
+    const metricsKey = getUserStorageKey('syncMetrics', userId);
+
+    localStorage.setItem(lastSyncKey, new Date().toISOString());
+    localStorage.setItem(durationKey, duration.toString());
+    localStorage.setItem(errorsKey, JSON.stringify([...new Set(errors)]));
     
-    // Store sync metrics
     const metrics = syncMetricsService.getMetrics();
-    localStorage.setItem('syncMetrics', JSON.stringify(metrics));
+    localStorage.setItem(metricsKey, JSON.stringify(metrics));
   }
 
   recordSyncOperation(operationName: string, duration: number, success: boolean, error?: string): void {
     syncMetricsService.recordOperation(operationName, duration, success, error);
   }
 
-  storeSyncErrors(errors: string[]): void {
-    localStorage.setItem('syncErrors', JSON.stringify([...new Set(errors)]));
+  storeSyncErrors(errors: string[], userId?: string): void {
+    const errorsKey = getUserStorageKey('syncErrors', userId);
+    localStorage.setItem(errorsKey, JSON.stringify([...new Set(errors)]));
   }
 }
 
