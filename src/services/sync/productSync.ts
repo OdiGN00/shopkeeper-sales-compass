@@ -8,7 +8,6 @@ export const productSync = {
   async syncProducts(): Promise<SyncResult> {
     console.log('ProductSync: Syncing products...');
     
-    // Get current user ID
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return { success: false, errors: ['User not authenticated'], synced: 0 };
@@ -31,7 +30,6 @@ export const productSync = {
 
     for (const product of unsyncedProducts) {
       try {
-        // Check if product already exists for this user
         const { data: existingProduct } = await supabase
           .from('products')
           .select('id')
@@ -40,7 +38,6 @@ export const productSync = {
           .maybeSingle();
 
         if (!existingProduct) {
-          // Create new product with user_id
           const { error } = await supabase
             .from('products')
             .insert({
@@ -62,7 +59,6 @@ export const productSync = {
           }
         }
 
-        // Mark as synced in localStorage
         const updatedProducts = products.map(p => 
           p.id === product.id ? { ...p, synced: true } : p
         );
@@ -80,9 +76,13 @@ export const productSync = {
 
   async pullProducts(): Promise<{ products: any[], errors: string[] }> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { products: [], errors: ['Not authenticated'] };
+
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (productsError) {
         return { products: [], errors: [`Failed to pull products: ${productsError.message}`] };

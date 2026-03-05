@@ -2,12 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { customerService } from "@/services/customerService";
 import { Customer, CreditTransaction } from "@/types/customer";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserStorage } from "@/hooks/useUserStorage";
 
 export const useCustomerOperations = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { getItem } = useUserStorage();
 
-  // Get all customers for the current user
   const {
     data: customers = [],
     isLoading,
@@ -19,7 +20,6 @@ export const useCustomerOperations = () => {
     enabled: !!user?.id
   });
 
-  // Get all credit transactions for the current user (from Supabase + local storage)
   const {
     data: supabaseCreditTransactions = [],
     isLoading: creditTransactionsLoading,
@@ -31,14 +31,12 @@ export const useCustomerOperations = () => {
     enabled: !!user?.id
   });
 
-  // Merge Supabase credit transactions with local ones
+  // Merge Supabase credit transactions with local ones using user-specific key
   const creditTransactions = [...supabaseCreditTransactions];
   
-  // Add local credit transactions that haven't been synced yet
   if (typeof window !== 'undefined') {
-    const localCreditTransactions = JSON.parse(localStorage.getItem('creditTransactions') || '[]');
+    const localCreditTransactions = getItem<any[]>('creditTransactions', []);
     localCreditTransactions.forEach((localTransaction: any) => {
-      // Only add if it's not already in the Supabase data
       const existsInSupabase = supabaseCreditTransactions.some(
         supabaseTransaction => 
           supabaseTransaction.customerId === localTransaction.customerId &&

@@ -8,7 +8,6 @@ export const creditTransactionSync = {
   async syncCreditTransactions(): Promise<SyncResult> {
     console.log('CreditTransactionSync: Syncing credit transactions...');
     
-    // Get current user ID
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       return { success: false, errors: ['User not authenticated'], synced: 0 };
@@ -47,7 +46,6 @@ export const creditTransactionSync = {
           continue;
         }
 
-        // Mark as synced in localStorage
         const updatedTransactions = transactions.map(t => 
           t.id === transaction.id ? { ...t, synced: true } : t
         );
@@ -65,9 +63,13 @@ export const creditTransactionSync = {
 
   async pullCreditTransactions(): Promise<{ transactions: any[], errors: string[] }> {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { transactions: [], errors: ['Not authenticated'] };
+
       const { data: transactionsData, error: transactionsError } = await supabase
         .from('credit_transactions')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id);
 
       if (transactionsError) {
         return { transactions: [], errors: [`Failed to pull credit transactions: ${transactionsError.message}`] };

@@ -22,9 +22,9 @@ export class SyncValidationService {
     }
   }
 
-  async performLocalDataCleanup(errors: string[]): Promise<number> {
+  async performLocalDataCleanup(errors: string[], userId?: string): Promise<number> {
     console.log('SyncValidationService: Cleaning up local duplicates...');
-    const dedupeResult = await duplicatePreventionService.deduplicateLocalStorage();
+    const dedupeResult = await duplicatePreventionService.deduplicateLocalStorage(userId);
     if (dedupeResult.fixed > 0) {
       console.log(`SyncValidationService: Fixed ${dedupeResult.fixed} duplicate entries`);
     }
@@ -34,9 +34,9 @@ export class SyncValidationService {
     return dedupeResult.fixed;
   }
 
-  async validateLocalDataConsistency(errors: string[]): Promise<void> {
+  async validateLocalDataConsistency(errors: string[], userId?: string): Promise<void> {
     console.log('SyncValidationService: Validating local data consistency...');
-    const localValidation = await dataConsistencyService.validateLocalStorageData();
+    const localValidation = await dataConsistencyService.validateLocalStorageData(userId);
     if (localValidation.errors.length > 0) {
       console.warn('SyncValidationService: Local data issues found:', localValidation.errors);
       errors.push(...localValidation.errors.map(err => `Local data: ${err}`));
@@ -49,14 +49,12 @@ export class SyncValidationService {
   async performPostSyncValidation(errors: string[]): Promise<void> {
     console.log('SyncValidationService: Running post-sync validation...');
     try {
-      // Validate database consistency after sync
       const postSyncValidation = await transactionWrapper.validateDatabaseState();
       if (!postSyncValidation.valid) {
         console.warn('SyncValidationService: Post-sync database issues:', postSyncValidation.issues);
         errors.push(...postSyncValidation.issues.map(issue => `Post-sync: ${issue}`));
       }
 
-      // Run comprehensive data consistency check
       const consistencyResult = await dataConsistencyService.checkAndFixConsistency();
       if (consistencyResult.issues.length > 0) {
         console.warn('SyncValidationService: Database consistency issues found:', consistencyResult.issues);
