@@ -34,8 +34,9 @@ export const useUserStorage = () => {
     try {
       const userKey = getUserKey(key);
       localStorage.setItem(userKey, JSON.stringify(value));
-      // Dispatch storage event to notify other components
+      // Dispatch events to notify other components and trigger auto-sync
       window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new Event('localDataChanged'));
     } catch (error) {
       console.error(`Error writing ${key} to storage:`, error);
     }
