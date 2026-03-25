@@ -4,6 +4,7 @@ import { connectivityService } from "./connectivityService";
 import { productSync } from "./productSync";
 import { customerSync } from "./customerSync";
 import { creditTransactionSync } from "./creditTransactionSync";
+import { salesSync } from "./salesSync";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserStorageKey } from "@/hooks/useUserStorage";
 
@@ -35,6 +36,9 @@ export class DataPullManager {
 
       // Pull credit transactions
       synced += await this.pullCreditTransactions(errors, user.id);
+
+      // Pull sales
+      synced += await this.pullSales(errors, user.id);
 
       // Update metadata
       this.updatePullMetadata(errors, user.id);

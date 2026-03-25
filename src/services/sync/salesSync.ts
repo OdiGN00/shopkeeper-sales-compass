@@ -193,5 +193,122 @@ export const salesSync = {
 
     console.log(`SalesSync: Completed. Synced: ${synced}, Errors: ${errors.length}`);
     return { success: errors.length === 0, errors, synced };
+  },
+
+  async pullSales(): Promise<{ sales: any[], errors: string[] }> {
+    console.log('SalesSync: Pulling sales from server...');
+    const errors: string[] = [];
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        return { sales: [], errors: ['User not authenticated'] };
+      }
+
+      // Fetch sales with their items
+      const { data: salesData, error: salesError } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          total_amount,
+          payment_type,
+          customer_id,
+          sale_date,
+          created_at,
+          notes,
+          sync_status
+        `)
+        .eq('user_id', user.id)
+        .order('sale_date', { ascending: false });
+
+      if (salesError) {
+        errors.push(`Failed to pull sales: ${salesError.message}`);
+        return { sales: [], errors };
+      }
+
+      if (!salesData || salesData.length === 0) {
+        return { sales: [], errors: [] };
+      }
+
+      // Fetch sale items for all sales
+      const saleIds = salesData.map(s => s.id);
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('sale_items')
+        .select(`
+          sale_id,
+          quantity,
+          unit_price,
+          total_price,
+          product_id
+        `)
+        .in('sale_id', saleIds);
+
+      if (itemsError) {
+        errors.push(`Failed to pull sale items: ${itemsError.message}`);
+      }
+
+      // Fetch product names for mapping
+      const productIds = [...new Set((itemsData || []).map(i => i.product_id).filter(Boolean))];
+      let productMap: Record<string, string> = {};
+      if (productIds.length > 0) {
+        const { data: productsData } = await supabase
+          .from('products')
+          .select('id, name')
+          .in('id', productIds);
+        if (productsData) {
+          productMap = Object.fromEntries(productsData.map(p => [p.id, p.name]));
+        }
+      }
+
+      // Fetch customer names
+      const customerIds = [...new Set(salesData.map(s => s.customer_id).filter(Boolean))];
+      let customerMap: Record<string, { name: string; phone: string }> = {};
+      if (customerIds.length > 0) {
+        const { data: customersData } = await supabase
+          .from('customers')
+          .select('id, name, phone')
+          .in('id', customerIds as string[]);
+        if (customersData) {
+          customerMap = Object.fromEntries(customersData.map(c => [c.id, { name: c.name, phone: c.phone }]));
+        }
+      }
+
+      const paymentTypeMap: Record<string, 'cash' | 'mobile-money' | 'credit'> = {
+        'cash': 'cash',
+        'mobile_money': 'mobile-money',
+        'credit': 'credit'
+      };
+
+      const sales = salesData.map(sale => {
+        const saleItems = (itemsData || [])
+          .filter(item => item.sale_id === sale.id)
+          .map(item => ({
+            id: item.product_id || '',
+            name: productMap[item.product_id || ''] || 'Unknown Product',
+            price: Number(item.unit_price),
+            quantity: item.quantity
+          }));
+
+        return {
+          id: sale.id,
+          items: saleItems,
+          total: Number(sale.total_amount),
+          paymentType: paymentTypeMap[sale.payment_type] || 'cash',
+          customer: sale.customer_id && customerMap[sale.customer_id]
+            ? { id: sale.customer_id, ...customerMap[sale.customer_id] }
+            : undefined,
+          timestamp: sale.sale_date || sale.created_at,
+          synced: true
+        };
+      });
+
+      console.log(`SalesSync: Pulled ${sales.length} sales from server`);
+      return { sales, errors };
+
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      errors.push(`Failed to pull sales: ${errorMsg}`);
+      return { sales: [], errors };
+    }
   }
 };
