@@ -138,6 +138,32 @@ export class DataPullManager {
     }
   }
 
+  private async pullSales(errors: string[], userId: string): Promise<number> {
+    try {
+      const storageKey = getUserStorageKey('sales', userId);
+      const salesResult = await salesSync.pullSales();
+      
+      if (salesResult.errors.length > 0) {
+        errors.push(...salesResult.errors);
+        return 0;
+      } else {
+        const existingSales = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        
+        if (salesResult.sales.length > 0 || existingSales.length === 0) {
+          localStorage.setItem(storageKey, JSON.stringify(salesResult.sales));
+          return salesResult.sales.length;
+        } else {
+          console.warn('DataPullManager: Server returned empty sales but local has data - keeping local data');
+          return 0;
+        }
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      errors.push(`Failed to pull sales: ${errorMsg}`);
+      return 0;
+    }
+  }
+
   private updatePullMetadata(errors: string[], userId: string) {
     const syncMetaKey = getUserStorageKey('syncMeta', userId);
     const syncMeta = {
