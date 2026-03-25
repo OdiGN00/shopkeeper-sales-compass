@@ -68,15 +68,18 @@ const autoPullFromServer = async (userId: string) => {
     const { productSync } = await import('@/services/sync/productSync');
     const { customerSync } = await import('@/services/sync/customerSync');
     const { creditTransactionSync } = await import('@/services/sync/creditTransactionSync');
+    const { salesSync } = await import('@/services/sync/salesSync');
 
     const productsKey = getUserStorageKey('products', userId);
     const customersKey = getUserStorageKey('customers', userId);
     const creditTransactionsKey = getUserStorageKey('creditTransactions', userId);
+    const salesKey = getUserStorageKey('sales', userId);
 
     // Only pull if local storage is empty for this user
     const hasLocalProducts = localStorage.getItem(productsKey);
     const hasLocalCustomers = localStorage.getItem(customersKey);
     const hasLocalCreditTransactions = localStorage.getItem(creditTransactionsKey);
+    const hasLocalSales = localStorage.getItem(salesKey);
 
     if (!hasLocalProducts || JSON.parse(hasLocalProducts).length === 0) {
       console.log('AuthContext: Auto-pulling products from server...');
@@ -102,6 +105,15 @@ const autoPullFromServer = async (userId: string) => {
       if (transactions.length > 0) {
         localStorage.setItem(creditTransactionsKey, JSON.stringify(transactions));
         console.log(`AuthContext: Pulled ${transactions.length} credit transactions from server`);
+      }
+    }
+
+    if (!hasLocalSales || JSON.parse(hasLocalSales).length === 0) {
+      console.log('AuthContext: Auto-pulling sales from server...');
+      const { sales } = await salesSync.pullSales();
+      if (sales.length > 0) {
+        localStorage.setItem(salesKey, JSON.stringify(sales));
+        console.log(`AuthContext: Pulled ${sales.length} sales from server`);
       }
     }
 
