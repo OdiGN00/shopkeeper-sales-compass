@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { QuickSalesEntry } from "@/components/QuickSalesEntry";
 import { InventorySnapshot } from "@/components/InventorySnapshot";
 import { DailyReportSummary } from "@/components/DailyReportSummary";
-import { SyncStatusWidget } from "@/components/SyncStatusWidget";
+
 import { NavigationTabs } from "@/components/NavigationTabs";
 import { SalesHistory } from "@/components/SalesHistory";
 import { ProductsManager } from "@/components/ProductsManager";
@@ -41,8 +41,7 @@ const Index = () => {
                 <DailyReportSummary />
               </div>
               
-              {/* Sync Status */}
-              <SyncStatusWidget />
+              {/* Sync is handled automatically by AutoSyncProvider */}
             </main>
           </>
         );
