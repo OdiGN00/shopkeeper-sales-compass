@@ -2,11 +2,12 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Customer, CreditTransaction } from "@/types/customer";
 import { handleSupabaseError } from "@/utils/errorHandling";
+import { logger } from "@/utils/logger";
 
 export const customerService = {
   // Customer operations
   async getCustomers(userId: string): Promise<Customer[]> {
-    console.log('CustomerService: Fetching customers from Supabase for user:', userId);
+    logger.debug('CustomerService: Fetching customers');
     const { data, error } = await supabase
       .from('customers')
       .select('*')
@@ -14,12 +15,12 @@ export const customerService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('CustomerService: Error fetching customers:', error);
+      logger.error('CustomerService: Error fetching customers');
       const safeError = handleSupabaseError(error);
       throw new Error(safeError.message);
     }
 
-    console.log('CustomerService: Fetched customers:', data);
+    logger.debug('CustomerService: Fetched customers count:', data?.length);
     return data.map(customer => ({
       ...customer,
       createdAt: new Date(customer.created_at),
@@ -29,7 +30,7 @@ export const customerService = {
   },
 
   async addCustomer(customerData: Omit<Customer, 'id' | 'createdAt' | 'updatedAt' | 'synced'>, userId: string): Promise<Customer> {
-    console.log('CustomerService: Adding customer to Supabase:', customerData, 'for user:', userId);
+    logger.debug('CustomerService: Adding customer');
     const { data, error } = await supabase
       .from('customers')
       .insert({
@@ -44,12 +45,12 @@ export const customerService = {
       .single();
 
     if (error) {
-      console.error('CustomerService: Error adding customer:', error);
+      logger.error('CustomerService: Error adding customer');
       const safeError = handleSupabaseError(error);
       throw new Error(safeError.message);
     }
 
-    console.log('CustomerService: Added customer:', data);
+    logger.debug('CustomerService: Customer added successfully');
     return {
       ...data,
       createdAt: new Date(data.created_at),
@@ -59,7 +60,7 @@ export const customerService = {
   },
 
   async updateCustomer(customerId: string, updates: Partial<Customer>, userId: string): Promise<Customer> {
-    console.log('CustomerService: Updating customer:', customerId, updates, 'for user:', userId);
+    logger.debug('CustomerService: Updating customer');
     const { data, error } = await supabase
       .from('customers')
       .update({
@@ -75,12 +76,12 @@ export const customerService = {
       .single();
 
     if (error) {
-      console.error('CustomerService: Error updating customer:', error);
+      logger.error('CustomerService: Error updating customer');
       const safeError = handleSupabaseError(error);
       throw new Error(safeError.message);
     }
 
-    console.log('CustomerService: Updated customer:', data);
+    logger.debug('CustomerService: Customer updated successfully');
     return {
       ...data,
       createdAt: new Date(data.created_at),
@@ -90,7 +91,7 @@ export const customerService = {
   },
 
   async deleteCustomer(customerId: string, userId: string): Promise<void> {
-    console.log('CustomerService: Deleting customer:', customerId, 'for user:', userId);
+    logger.debug('CustomerService: Deleting customer');
     const { error } = await supabase
       .from('customers')
       .delete()
@@ -98,17 +99,17 @@ export const customerService = {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('CustomerService: Error deleting customer:', error);
+      logger.error('CustomerService: Error deleting customer');
       const safeError = handleSupabaseError(error);
       throw new Error(safeError.message);
     }
 
-    console.log('CustomerService: Deleted customer:', customerId);
+    logger.debug('CustomerService: Customer deleted successfully');
   },
 
   // Credit transaction operations
   async getCreditTransactions(userId: string): Promise<CreditTransaction[]> {
-    console.log('CustomerService: Fetching credit transactions from Supabase for user:', userId);
+    logger.debug('CustomerService: Fetching credit transactions');
     const { data, error } = await supabase
       .from('credit_transactions')
       .select('*')
@@ -116,12 +117,12 @@ export const customerService = {
       .order('transaction_date', { ascending: false });
 
     if (error) {
-      console.error('CustomerService: Error fetching credit transactions:', error);
+      logger.error('CustomerService: Error fetching credit transactions');
       const safeError = handleSupabaseError(error);
       throw new Error(safeError.message);
     }
 
-    console.log('CustomerService: Fetched credit transactions:', data);
+    logger.debug('CustomerService: Fetched credit transactions count:', data?.length);
     return data.map(transaction => ({
       id: transaction.id,
       customerId: transaction.customer_id,
@@ -134,7 +135,7 @@ export const customerService = {
   },
 
   async addCreditTransaction(transaction: Omit<CreditTransaction, 'id' | 'synced'>, userId: string): Promise<CreditTransaction> {
-    console.log('CustomerService: Adding credit transaction to Supabase:', transaction, 'for user:', userId);
+    logger.debug('CustomerService: Adding credit transaction');
     const { data, error } = await supabase
       .from('credit_transactions')
       .insert({
@@ -150,12 +151,12 @@ export const customerService = {
       .single();
 
     if (error) {
-      console.error('CustomerService: Error adding credit transaction:', error);
+      logger.error('CustomerService: Error adding credit transaction');
       const safeError = handleSupabaseError(error);
       throw new Error(safeError.message);
     }
 
-    console.log('CustomerService: Added credit transaction:', data);
+    logger.debug('CustomerService: Credit transaction added successfully');
     return {
       id: data.id,
       customerId: data.customer_id,

@@ -5,6 +5,7 @@ import { Customer } from "@/types/customer";
 import { Product } from "./inventoryService";
 import { productEnsureSync } from "./sync/productEnsureSync";
 import { getUserStorageKey } from "@/hooks/useUserStorage";
+import { logger } from "@/utils/logger";
 
 // Helper function to check if a string is a valid UUID
 const isValidUUID = (str: string): boolean => {
@@ -15,7 +16,7 @@ const isValidUUID = (str: string): boolean => {
 export const salesService = {
   async saveSale(sale: Sale): Promise<{ saleId: string; success: boolean; error?: string }> {
     try {
-      console.log('SalesService: Saving sale with enhanced validation:', sale);
+      logger.debug('SalesService: Saving sale');
       
       const paymentTypeMap = {
         'mobile-money': 'mobile_money' as const,
@@ -45,7 +46,7 @@ export const salesService = {
         return { saleId: '', success: false, error: 'No matching products found in inventory' };
       }
 
-      console.log('SalesService: Ensuring products exist with enhanced validation...');
+      logger.debug('SalesService: Ensuring products exist');
       const productEnsureResult = await productEnsureSync.ensureProductsExist(relevantProducts);
       
       if (!productEnsureResult.success) {
@@ -55,7 +56,7 @@ export const salesService = {
       const mappedSaleItems = sale.items.map(item => {
         const supabaseProductId = productEnsureResult.productMap.get(item.id);
         if (!supabaseProductId) {
-          throw new Error(`Product mapping not found for item: ${item.name} (${item.id})`);
+          throw new Error(`Product mapping not found for item: ${item.name}`);
         }
         return {
           product_id: supabaseProductId,
@@ -126,7 +127,7 @@ export const salesService = {
 
       return { saleId: saleData.id, success: true };
     } catch (error) {
-      console.error('SalesService: Unexpected error:', error);
+      logger.error('SalesService: Unexpected error');
       return { saleId: '', success: false, error: error instanceof Error ? error.message : 'Unexpected error occurred' };
     }
   }

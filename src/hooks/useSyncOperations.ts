@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { syncService } from "@/services/syncService";
+import { logger } from "@/utils/logger";
 
 export const useSyncOperations = () => {
   const [isSyncing, setIsSyncing] = useState(false);
@@ -10,9 +11,9 @@ export const useSyncOperations = () => {
   const handleSync = async () => {
     setIsSyncing(true);
     try {
-      console.log('SyncOperations: Starting sync...');
+      logger.debug('SyncOperations: Starting sync');
       const result = await syncService.syncAll();
-      console.log('SyncOperations: Sync completed:', result);
+      logger.debug('SyncOperations: Sync completed, synced:', result.synced);
       
       if (result.success) {
         toast({
@@ -26,10 +27,10 @@ export const useSyncOperations = () => {
           variant: "destructive",
         });
         
-        console.error('SyncOperations: Sync errors:', result.errors);
+        logger.error('SyncOperations: Sync had errors');
       }
     } catch (error) {
-      console.error('SyncOperations: Sync error:', error);
+      logger.error('SyncOperations: Sync failed');
       toast({
         title: "Sync Failed",
         description: "Failed to sync data. Please try again.",
@@ -43,9 +44,9 @@ export const useSyncOperations = () => {
   const handlePullFromSupabase = async () => {
     setIsSyncing(true);
     try {
-      console.log('SyncOperations: Starting pull from Supabase...');
+      logger.debug('SyncOperations: Starting pull from server');
       const result = await syncService.pullFromSupabase();
-      console.log('SyncOperations: Pull completed:', result);
+      logger.debug('SyncOperations: Pull completed, synced:', result.synced);
       
       if (result.success) {
         toast({
@@ -59,10 +60,10 @@ export const useSyncOperations = () => {
           variant: "destructive",
         });
         
-        console.error('SyncOperations: Pull errors:', result.errors);
+        logger.error('SyncOperations: Pull had errors');
       }
     } catch (error) {
-      console.error('SyncOperations: Pull error:', error);
+      logger.error('SyncOperations: Pull failed');
       toast({
         title: "Pull Failed",
         description: "Failed to pull data from server. Please try again.",

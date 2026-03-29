@@ -4,6 +4,7 @@ import { connectivityService } from "./sync/connectivityService";
 import { SyncStatusManager } from "./sync/syncStatusManager";
 import { SyncOrchestrator } from "./sync/syncOrchestrator";
 import { DataPullManager } from "./sync/dataPullManager";
+import { logger } from "@/utils/logger";
 
 class SyncService {
   private syncInProgress = false;
@@ -21,7 +22,7 @@ class SyncService {
     try {
       return await connectivityService.checkConnectivity();
     } catch (error) {
-      console.error('Connectivity check failed:', error);
+      logger.error('Connectivity check failed');
       return false;
     }
   }
@@ -46,7 +47,7 @@ class SyncService {
       const status = await this.getSyncStatus();
       this.statusManager.notifySyncStatusChange(status);
 
-      console.log('SyncService: Enhanced full sync completed', result);
+      logger.debug('SyncService: Full sync completed', result.synced);
       return result;
 
     } finally {
