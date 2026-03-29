@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { QuickSalesEntry } from "@/components/QuickSalesEntry";
 import { InventorySnapshot } from "@/components/InventorySnapshot";
@@ -41,8 +41,7 @@ const Index = () => {
                 <DailyReportSummary />
               </div>
               
-              {/* Sync Status */}
-              <SyncStatusWidget />
+              {/* Sync is handled automatically by AutoSyncProvider */}
             </main>
           </>
         );
