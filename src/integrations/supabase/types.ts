@@ -436,6 +436,7 @@ export type Database = {
           sync_status: Database["public"]["Enums"]["sync_status"] | null
           synced_at: string | null
           table_name: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -446,6 +447,7 @@ export type Database = {
           sync_status?: Database["public"]["Enums"]["sync_status"] | null
           synced_at?: string | null
           table_name: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -456,6 +458,7 @@ export type Database = {
           sync_status?: Database["public"]["Enums"]["sync_status"] | null
           synced_at?: string | null
           table_name?: string
+          user_id?: string | null
         }
         Relationships: []
       }
