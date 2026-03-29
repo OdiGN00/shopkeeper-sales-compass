@@ -42,15 +42,36 @@ export const salesSync = {
       updatedAt: new Date(p.updatedAt)
     })) : [];
 
-    // Get unique products used in sales
+    // Get unique products used in sales — include products from sale items
+    // even if they're no longer in localStorage
     const usedProductIds = new Set<string>();
+    const saleItemProductInfo = new Map<string, { name: string; price: number }>();
     unsyncedSales.forEach(sale => {
       sale.items.forEach(item => {
         usedProductIds.add(item.id);
+        if (!saleItemProductInfo.has(item.id)) {
+          saleItemProductInfo.set(item.id, { name: item.name, price: item.price });
+        }
       });
     });
 
+    // Start with products found in localStorage
     const requiredProducts = localProducts.filter((p: any) => usedProductIds.has(p.id));
+    
+    // For products not found locally, create minimal product entries from sale item data
+    const foundLocalIds = new Set(requiredProducts.map((p: any) => p.id));
+    for (const [itemId, info] of saleItemProductInfo) {
+      if (!foundLocalIds.has(itemId)) {
+        requiredProducts.push({
+          id: itemId,
+          name: info.name,
+          sellingPrice: info.price,
+          quantity: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      }
+    }
     
     // Ensure all required products exist in Supabase
     console.log('SalesSync: Ensuring required products exist in Supabase...');
