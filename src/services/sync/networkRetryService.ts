@@ -99,14 +99,20 @@ export class NetworkRetryService {
   async testConnectivity(): Promise<{ online: boolean; latency?: number; error?: string }> {
     try {
       const startTime = Date.now();
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      if (!supabaseUrl || !supabasePublishableKey) {
+        throw new Error('Missing Supabase environment configuration');
+      }
       
       // Simple connectivity test using Supabase
       const response = await this.executeWithRetry(
         async () => {
-          const response = await fetch('https://fxsszxmtbugbjsxhpwkt.supabase.co/rest/v1/', {
+          const response = await fetch(`${supabaseUrl}/rest/v1/`, {
             method: 'HEAD',
             headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4c3N6eG10YnVnYmpzeGhwd2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk5MTcwMjAsImV4cCI6MjA2NTQ5MzAyMH0.WpZ_FIVIw7XgwrYO5cy_40cEa9poJNR2USKXjrmxrFM'
+              'apikey': supabasePublishableKey
             }
           });
           
